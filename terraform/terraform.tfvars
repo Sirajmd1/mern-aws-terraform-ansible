@@ -1,0 +1,5 @@
+aws_region      = "ap-south-1"
+project_name    = "travelmemory-mern"
+my_ip           = "13.232.169.135/32"
+key_name        = "travelmemory-key"
+public_key_path = "/home/ec2-user/.ssh/id_rsa.pub"

@@ -1,0 +1,83 @@
+---
+- name: Configure web server and deploy TravelMemory MERN application
+  hosts: web
+  become: yes
+
+  vars:
+    repo_url: "https://github.com/UnpredictablePrashant/TravelMemory.git"
+    app_dir: "/opt/TravelMemory"
+    backend_port: 3001
+    frontend_port: 3000
+    db_private_ip: "10.0.2.217"
+    mongo_db_name: "travelmemory"
+    mongo_user: "traveluser"
+    mongo_password: "TravelMemory@123"
+    web_public_ip: "13.232.80.87"
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install required packages
+      apt:
+        name:
+          - git
+          - curl
+          - build-essential
+          - ufw
+        state: present
+
+    - name: Install Node.js 18
+      shell: |
+        curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+        apt-get install -y nodejs
+      args:
+        creates: /usr/bin/node
+
+    - name: Install PM2 globally
+      npm:
+        name: pm2
+        global: yes
+
+    - name: Clone TravelMemory repository
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_dir }}"
+        version: main
+        force: yes
+
+    - name: Create backend .env file
+      copy:
+        dest: "{{ app_dir }}/backend/.env"
+        content: |
+          MONGO_URI=mongodb://{{ mongo_user }}:{{ mongo_password }}@{{ db_private_ip }}:27017/{{ mongo_db_name }}?authSource={{ mongo_db_name }}
+          PORT={{ backend_port }}
+
+    - name: Install backend dependencies
+      npm:
+        path: "{{ app_dir }}/backend"
+
+    - name: Start backend using PM2
+      shell: |
+        cd {{ app_dir }}/backend
+        pm2 delete travelmemory-backend || true
+        pm2 start index.js --name travelmemory-backend
+        pm2 save
+
+    - name: Create frontend .env file
+      copy:
+        dest: "{{ app_dir }}/frontend/.env"
+        content: |
+          REACT_APP_BACKEND_URL=http://{{ web_public_ip }}:{{ backend_port }}
+
+    - name: Install frontend dependencies
+      npm:
+        path: "{{ app_dir }}/frontend"
+
+    - name: Start frontend using PM2
+      shell: |
+        cd {{ app_dir }}/frontend
+        pm2 delete travelmemory-frontend || true
+        pm2 start npm --name travelmemory-frontend -- start
+        pm2 save
